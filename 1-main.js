@@ -1,0 +1,6 @@
+var c1 = require('./1-count')
+console.log(c1.count())
+var c2 = require('./1-count')
+console.log(c2.count())
+var c3 = require('./1-count')
+console.log(c3.count())

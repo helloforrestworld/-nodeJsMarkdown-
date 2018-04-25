@@ -1,0 +1,1 @@
+@node "A:\github\nodejs\2-node-echo.js" %*
