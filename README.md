@@ -126,3 +126,67 @@ package.json可以自定义入口模块的文件名和存放位置
 
 # 文件操作
 ## 拷贝
+### 小文件拷贝
+```javascript
+    var fs = require('fs');
+    
+    function copy(src, dst) { // 读取和写入
+        fs.writeFileSync(dst, fs.readFileSync(src));
+    }
+    
+    function main(argv) {
+        copy(argv[0], argv[1]);
+    }
+    
+    main(process.argv.slice(2));
+```
+### 大文件拷贝
+像之前那样一次性从磁盘读取到内存,再从内存写入磁盘,如果文件过大，内存会被撑满
+```javascript
+    var fs = require('fs');
+    
+    function copy(src, dst) {
+        fs.createReadStream(src).pipe(fs.createWriteStream(dst));
+    }
+    
+    function main(argv) {
+        copy(argv[0], argv[1]);
+    }
+    
+    main(process.argv.slice(2));
+```
+createReadStream创建只读数据流，createWriteStream创建只写数据流, pipe()连接起来
+## API
+### Buffer(数据块/缓冲器)
+JS语言本身没有二进制数据， Node提供Buffer构造函数操作二进制数据
+#### buffer创建
+```javascript
+    let buf = new Buffer([0x92, 0x21, 0x21]) // 每个字节用16进制表示
+    let buf = new Buffer('hello', 'utf-8') // 也可以通过字符串转换创建
+    let buf = new Buffer(5) // 声明长度为5的buffer
+    
+    // 也可以直接修改某个字节
+    buf[0] = 0x99
+    
+    let str = buf.toString('utf-8) // 转换为字符串
+```
+slice方法的问题
+与字符串不同的时字符串修改返回的是新的字符串, buffer修改则是修改本身
+```javascript
+    let buf = new Buffer([0x92, 0x21, 0x21, 0x44])
+    let buf1 = buf.slice(2)
+    let buf1[0] = 0x99
+    console.log(buf, buf1)
+    // <Buffer 0x92, 0x21, 0x99, 0x44 >
+    // <Buffer 0x99, 0x44 >
+    // slice像是返回了指向原Buffer中间的某个位置的指针
+```
+#### buffer复制
+声明一个新的buffer, 调用buffer.copy
+```javascript
+    let bin = new Buffer([0x92, 0x21, 0x21, 0x44])
+    let newBin = new Buffer(bin.length)
+    bin.copy(newBin)
+```
+### stream(数据流)
+对二进制数据的抽象，可以读取/生成 一部分  的同时 写入/处理 一部分
