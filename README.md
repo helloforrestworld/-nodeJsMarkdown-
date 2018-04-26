@@ -287,4 +287,66 @@ fs模块API基本可分为三类
   }
 ```
 ### Path(路径)
+1.path.normalize
+用于标准化路径
+具体讲的话，除了解析路径中的.与..外，还能去掉多余的斜杠
+```javascript
 
+  var cache = {}
+
+  function store(key, value) {
+      cache[path.normalize(key)] = value
+  }
+
+  store('foo/bar', 1)
+  store('foo//baz//../bar', 2)
+  console.log(cache);  // => { "foo/bar": 2 }
+```
+**注意**：normalize后Windows默认是用'\' 而 Linux 是 '/' 如果需要在任何系统都使用'/' 需要替换一下path.match(/\\/g, '/')
+2.path.join
+将传入的多个路径拼接为标准路径。该方法可避免手工拼接路径字符串的繁琐，并且能在不同系统下正确使用相应的路径分隔符。以下是一个例子
+```javascript
+  path.join('foo/', 'baz/', '../bar'); // => "foo/bar"
+```
+3.path.extname
+当我们需要根据不同文件扩展名做不同操作时，该方法就显得很好用。以下是一个例子：
+```javascript
+  path.extname('foo/bar.js'); // => ".js"
+```
+## 遍历目录
+### 递归算法
+
+目录是一个树状结构，在遍历时一般使用**深度优先**+**先序遍历**算法。深度优先，意味着到达一个节点后，首先接着遍历子节点而不是邻居节点。先序遍历，意味着首次到达了某节点就算遍历完成，而不是最后一次返回某节点才算数。因此使用这种遍历方式时，下边这棵树的遍历顺序是**A > B > D > E > C > F**。
+
+```javascript
+          A
+         / \
+        B   C
+       / \   \
+      D   E   F
+```
+
+**注意**： 使用递归算法编写的代码虽然简洁，但由于每递归一次就产生一次函数调用，在需要优先考虑性能时，需要把递归算法转换为循环算法，以减少函数调用次数。
+
+### 同步遍历
+```javascript
+    let fs = require('fs')
+    let path  = require('path')
+    function travel(dir, callback) {
+      fs.readdirSync(dir).forEach((file) => {
+        let pathname = path.join(dir, file)
+        if (fs.statSync(pathname).isDirectory()) {
+          travel(pathname, callback)
+        } else {
+          callback(pathname)
+        }
+      })
+    }
+    travel('./', (file) => {
+      console.log(file)
+    })
+```
+### 异步遍历
+```
+
+```
