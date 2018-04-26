@@ -347,6 +347,97 @@ fs模块API基本可分为三类
     })
 ```
 ### 异步遍历
+```javascript
+    function travel(dir, callback, finish) {
+        fs.readdir(dir, function (err, files) {
+            (function next(i) {  // 不能像同步的时候用forEach循环
+                if (i < files.length) {
+                    var pathname = path.join(dir, files[i]);
+    
+                    fs.stat(pathname, function (err, stats) {
+                        if (stats.isDirectory()) {
+                            travel(pathname, callback, function () {
+                                next(i + 1); // 用于外层next跳到下一个
+                            });
+                        } else {
+                            callback(pathname, function () {
+                                next(i + 1); //  callback操作完成后再下一个文件
+                            });
+                        }
+                    });
+                } else {
+                    finish && finish();
+                }
+            }(0));
+        });
+    }
 ```
+## 文本编码
+### BOM(Byte Order Mark)移除
+BOM用于标记一个文本文件使用Unicode编码，其本身是一个Unicode字符（"\uFEFF"），位于文本文件头部。在不同的Unicode编码下，BOM字符对应的二进制字节如下：
+```javascript
+        Bytes      Encoding
+    ----------------------------
+        FE FF       UTF16BE
+        FF FE       UTF16LE
+        EF BB BF    UTF8
+```
+虽然BOM起到标记文本编码的作用，但它本身并不属于文件的一部分，有时候文件合并的时候，编码的标记可能造成不正确的输出
+去除BOM的readFileSync
+```javascript
+    function readText(pathname) {
+        var bin = fs.readFileSync(pathname);
+    
+        if (bin[0] === 0xEF && bin[1] === 0xBB && bin[2] === 0xBF) {
+            bin = bin.slice(3);
+        }
+        return bin.toString('utf-8');
+    }
+```
+### GBK转UTF8
+GBK编码不在NodeJS自身支持范围内。因此，一般我们借助iconv-lite这个三方包来转换编码。使用NPM下载该包后，我们可以按下边方式编写一个读取GBK文本文件的函数。
+```javascript
+    var iconv = require('iconv-lite');
+    
+    function readGBKText(pathname) {
+        var bin = fs.readFileSync(pathname);
+    
+        return iconv.decode(bin, 'gbk');
+    }
+```
+### 单字节编码
+有时候读取文件的时候不能确定其编码,这种情况简单的处理方法就是单字节编码。
+因为无论utf8 还是 gbk 对于英文和英文字符解析的都是一样的, 都在ASCL0~128之间
+大多数我们需要处理的情况是操作读取到的英文js代码 (除字符串和注释)
+因此可以只处理js代码部分
+```javascript
+    1. GBK编码源文件内容：
+        var foo = '中文';
+    2. 对应字节：
+        76 61 72 20 66 6F 6F 20 3D 20 27 D6 D0 CE C4 27 3B
+    3. 使用单字节编码读取后得到的内容：
+        var foo = '{乱码}{乱码}{乱码}{乱码}';
+    4. 替换内容：
+        var bar = '{乱码}{乱码}{乱码}{乱码}';
+    5. 使用单字节编码保存后对应字节：
+        76 61 72 20 62 61 72 20 3D 20 27 D6 D0 CE C4 27 3B
+    6. 使用GBK编码读取后得到内容：
+        var bar = '中文';
+```
+**使用同样的单字节编码保存这些乱码字符时，背后对应的字节保持不变。**
+NodeJS中自带了一种binary编码可以用来实现这个方法
+```javascript
+    function replace(pathname) {
+        var str = fs.readFileSync(pathname, 'binary');
+        str = str.replace('foo', 'bar');
+        fs.writeFileSync(pathname, str, 'binary');
+    }
+```
+### 总结
+- 不要使用拼接字符串的方式来处理路径，使用path模块。
+- 需要对文件读写做到字节级别的精细控制时，请使用fs模块的文件底层操作API
+- 掌握好目录遍历和文件编码处理技巧，很实用。
 
-```
+# 网络操作
+## 开始
+    
