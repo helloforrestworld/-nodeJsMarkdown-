@@ -190,3 +190,101 @@ slice方法的问题
 ```
 ### stream(数据流)
 对二进制数据的抽象，可以读取/生成 一部分  的同时 写入/处理 一部分
+流的类型:
+    1. Readable - 可读的流 (例如 fs.createReadStream())
+    2. Writable - 可写的流 (例如 fs.createWriteStream())
+    3. Duplex - 可读写的流 (例如 net.Socket).
+    4. Tansform - 在读写过程中可以修改和变换数据的 Duplex 流 (例如 zlib.createDeflate())
+```javascript
+    var rs = fs.createReadStream(pathname);
+
+    rs.on('data', function (chunk) {
+        doSomething(chunk);
+    });
+    
+    rs.on('end', function () {
+        cleanUp();
+    });
+```
+上边的代码中data事件会源源不断地被触发，不管doSomething函数是否处理得过来。代码可以继续做如下改造，以解决这个问题。
+```javascript
+    var rs = fs.createReadStream(src);
+
+    rs.on('data', function (chunk) {
+        rs.pause();
+        doSomething(chunk, function () {
+            rs.resume();
+        });
+    });
+    
+    rs.on('end', function () {
+        cleanUp();
+    });
+```
+此外，我们也可以为数据目标创建一个只写数据流，示例如下：
+```javascript
+    var rs = fs.createReadStream(src);
+    var ws = fs.createWriteStream(dst);
+    
+    rs.on('data', function (chunk) {
+        ws.write(chunk);
+    });
+    
+    rs.on('end', function () {
+        ws.end();
+    });
+```
+当然，如果写入速度跟不上读取速度依然会爆仓
+改进如下:
+```javascript
+    var rs = fs.createReadStream(src)
+    var ws = fs.createWriteStream(dst)
+    rs.on('data', function (chunk) {
+        if (ws.write(chunk)  === false) {
+            rs.pause()
+        }
+    })
+    rs.on('end', function() {
+        ws.end()
+    })
+    rs.on('drain', function() {
+        rs.resume()
+    })
+```
+### File System(文件系统)
+fs模块API基本可分为三类
+1 . 文件属性读写。
+
+其中常用的有fs.stat、fs.chmod、fs.chown等等。
+
+2 . 文件内容读写。
+
+其中常用的有fs.readFile、fs.readdir、fs.writeFile、fs.mkdir等等。
+
+3 . 底层文件操作。
+
+其中常用的有fs.open、fs.read、fs.write、fs.close等等。
+
+异步IO在fs模块的体现, 读写文件的操作都在回调里完成
+以fs.readFile为例
+```javascript
+    fs.readFile(pathname, (err, data) => {
+        if (err) {
+            console.log(err)
+        } else {
+            // deal with data
+        }
+    })
+```
+此外，fs模块的所有异步API都有对应的同步版本，用于无法使用异步操作时，或者同步操作更方便时的情况。
+同步API除了方法名的末尾多了一个Sync之外，异常对象与执行结果的传递方式也有相应变化.
+```javascript
+  try {
+    let data = fs.readFileSync(pathname)
+    // deal with data
+  } catch (err) {
+    console.log(err)
+  }
+```
+### Path(路径)
+
