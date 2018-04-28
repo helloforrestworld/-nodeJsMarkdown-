@@ -533,3 +533,85 @@ https模块与http模块极为类似，区别在于https模块需要额外处理
             // ...
     });
 ```
+同一个服务器可以为多个域名配置不同的证书
+```javascript
+    server.addContext('foo.com', {
+        key: fs.readFileSync('./ssl/foo.com.key'),
+        cert: fs.readFileSync('./ssl/foo.com.cer')
+    });
+    
+    server.addContext('bar.com', {
+        key: fs.readFileSync('./ssl/bar.com.key'),
+        cert: fs.readFileSync('./ssl/bar.com.cer')
+    });
+```
+在客户端模式下，发起一个HTTPS客户端请求与http模块几乎相同，示例如下。
+```javascript
+    var options = {
+        hostname: 'www.example.com',
+        port: 443,
+        path: '/',
+        method: 'GET'
+    };
+
+    var request = https.request(options, function (response) {});
+    
+    request.end();
+```
+但如果目标服务器使用的SSL证书是自制的，不是从颁发机构购买的，默认情况下https模块会拒绝连接，提示说有证书安全问题。在options里加入**rejectUnauthorized: false**字段可以禁用对证书有效性的检查，从而允许https模块请求开发环境下使用自制证书的HTTPS服务器。
+### URL
+该模块允许解析URL、生成URL，以及拼接URL
+url.parse
+```javascript
+    url.parse('http://user:pass@host.com:8080/p/a/t/h?query=string#hash')
+    /* =>
+    { protocol: 'http:',
+      auth: 'user:pass',
+      host: 'host.com:8080',
+      port: '8080',
+      hostname: 'host.com',
+      hash: '#hash',
+      search: '?query=string',
+      query: 'query=string',
+      pathname: '/p/a/t/h',
+      path: '/p/a/t/h?query=string',
+      href: 'http://user:pass@host.com:8080/p/a/t/h?query=string#hash' }
+    */
+```
+传递给parse的不一定是完整的URL, 例如在服务器回调函数中，requeset.url中不包含协议头和域名
+```javascript
+    http.createServer(function (request, response) {
+        var tmp = request.url; // => "/foo/bar?a=b"
+        url.parse(tmp);
+        /* =>
+        { protocol: null,
+          slashes: null,
+          auth: null,
+          host: null,
+          port: null,
+          hostname: null,
+          hash: null,
+          search: '?a=b',
+          query: 'a=b',
+          pathname: '/foo/bar',
+          path: '/foo/bar?a=b',
+          href: '/foo/bar?a=b' }
+        */
+    }).listen(80);
+```
+.parse方法还支持第二个和第三个布尔类型可选参数。第二个参数等于true时，该方法返回的URL对象中，query字段不再是一个字符串，而是一个经过querystring模块转换后的参数对象。第三个参数等于true时，该方法可以正确解析不带协议头的URL，例如//www.example.com/foo/bar。
+
+url.format
+format方法则是相反， 把URL对象转换为URL字符串
+```javascript
+    url.format({
+        protocol: 'http:',
+        host: 'www.example.com',
+        pathname: '/p/a/t/h',
+        search: 'query=string'
+    });
+    /* =>
+    'http://www.example.com/p/a/t/h?query=string'
+    */
+```
+### Query String
