@@ -439,5 +439,97 @@ NodeJS中自带了一种binary编码可以用来实现这个方法
 - 掌握好目录遍历和文件编码处理技巧，很实用。
 
 # 网络操作
-## 开始
+## 一个简单的node服务器
+```javascript
+    const http = require('http')
+    http.createServer((req, res) => {
+      res.writeHead(200, {'Content-Type':'text-plain'})
+      res.end('Hello,World\n')
+    }).listen(8080, (err) => {
+      if(err) {
+        console.log(err)
+        return
+      }
+      console.log('a server has running at localhost:8080\n')
+    })
+```
+## API
+### http
+http模块提供两种使用方式
+
+- 作为服务器使用时, 创建一个HTTP服务器，监听HTTP客户端并相应请求
+- 作为客服端使用时, 发起一起HTTP请求，获取服务器相应
+
+HTTP请求本质上是一个数据流，由请求头（headers）和请求体（body）组成。例如以下是一个完整的HTTP请求数据内容。
+```javascript
+    POST / HTTP/1.1
+    User-Agent: curl/7.26.0
+    Host: localhost
+    Accept: */*
+    Content-Length: 11
+    Content-Type: application/x-www-form-urlencoded
     
+    Hello World
+```
+在回调函数中，除了可以使用request对象访问请求头数据外，还能把request对象当作一个只读数据流来访问请求体数据。
+```javascript
+    http.createServer(function (request, response) {
+        var body = [];
+    
+        console.log(request.method);
+        console.log(request.headers);
+    
+        request.on('data', function (chunk) {
+            body.push(chunk);
+        });
+    
+        request.on('end', function () {
+            body = Buffer.concat(body);
+            console.log(body.toString());
+        });
+    }).listen(80);
+```
+在回调函数中，除了可以使用response对象来写入响应头数据外，还能把response对象当作一个只写数据流来写入响应体数据。例如在以下例子中，服务端原样将客户端请求的请求体数据返回给客户端。
+```javascript
+    http.createServer(function (request, response) {
+        response.writeHead(200, { 'Content-Type': 'text/plain' });
+    
+        request.on('data', function (chunk) {
+            response.write(chunk);
+        });
+    
+        request.on('end', function () {
+            response.end();
+        });
+    }).listen(80);
+```
+发起一个http请求
+```javscript
+    var options = {
+            hostname: 'www.example.com',
+            port: 80,
+            path: '/upload',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        };
+    
+    var request = http.request(options, function (response) {});
+    
+    request.write('Hello World');
+    request.end()
+```
+### https
+https模块与http模块极为类似，区别在于https模块需要额外处理SSL证书。
+在服务端模式下，创建一个HTTPS服务器的示例如下。
+```javascript
+    var options = {
+        key: fs.readFileSync('./ssl/default.key'), // 私钥
+        cert: fs.readFileSync('./ssl/default.cer') // 公钥
+    };
+
+    var server = https.createServer(options, function (request, response) {
+            // ...
+    });
+```
