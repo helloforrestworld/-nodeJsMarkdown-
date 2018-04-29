@@ -627,3 +627,110 @@ querystring模块用于实现URL参数字符串与参数对象的互相转换
   'foo=bar&baz=qux&baz=quux&corge='
   */
 ```
+### Zlib
+zlib模块提供了数据压缩和解压的功能。当我们处理HTTP请求和响应时，可能需要用到这个模块。
+
+使用Zlib.gzip压缩返回的数据
+```javascript
+  let zlib = require('zlib')
+  http.createServer(function(request, response) {
+    let data = '',
+        i = 1024
+    while (i--) {
+      data += ','
+    }
+    if ((request.headers['accept-encoding'] || '').indexOf('gzip') !== -1) { // 接受压缩数据
+      zlib.gzip(data, function(err, data){
+        response.writeHead(200, {
+          'Content-Type': 'text/plain',
+          'Content-Encoding': 'gzip'
+        })
+        response.end(data)
+      })
+    } else {
+      response.writeHead(200, {
+        'Content-Type': 'text/plain'
+      })
+      response.end(data)
+    }
+  }).listen(80)
+```
+使用zlib.gunzip解压接受的数据
+```javascript
+  let options = {
+    hostname: 'www.example.com',
+    port: 80,
+    path: '/'
+    method: 'GET',
+    headers: {
+      'Accept-Encoding': 'gzip deflate'
+    }
+  }
+  http.request(options, function(response) {
+    var body = []
+    response.on('data', function(chunk) {
+      body.push(chunk)
+    })
+    response.on('end', function() {
+      body = Buffer.concat(body)
+      if ((response.headers['content-encoding'] || '').indexOf('gzip') !== -1) {
+        zlib.gunzip(body, function(err, data) {
+          console.log(data.toString())
+        })
+      } else {
+        console.log(data.toString())
+      }
+    })
+  })
+```
+### Net
+net模块可用于创建Socket服务器或Socket客户端。
+Socket服务器, 这个HTTP服务器不管收到啥请求，都固定返回相同的响应。
+```javascript
+  let net = require('net')
+  net.createServer(function(conn) {
+    conn.on('data', function(data) {
+      conn.write([
+        'HTTP/1.1 200 OK',
+        'Content-Type: text/plain',
+        'Content-Length: 11',
+        '',
+        'Hello World'
+      ].join('\n'))
+    })
+  }).listen(80)
+```
+Socket发起HTTP客户端请求
+```javascript
+  let options = {
+    port: 80,
+    host: 'www.example.com'
+  }
+  let client = net.connect(options, function() {
+    client.write([
+      'GET/HTTP/1.1'
+      'User-Agent: curl/7.26.0'
+      'Host: www.baidu.com',
+      'Accept: */*',
+      '',
+      ''
+    ].join('\n'))
+  })
+  client.on('data', function(data) {
+    console.log(data.toString())
+    client.end()
+  })
+```
+**一些注意**
+ - 为什么通过headers对象访问到的HTTP请求头或响应头字段不是驼峰的？
+ 
+ 答： 从规范上讲，HTTP请求头和响应头字段都应该是驼峰的。但现实是残酷的，不是每个HTTP服务端或客户端程序都严格遵循规范，所以NodeJS在处理从别的客户端或服务端收到的头字段时，都统一地转换为了小写字母格式，以便开发者能使用统一的方式来访问头字段，例如headers['content-length']。
+ 
+ - 为什么http模块创建的HTTP服务器返回的响应是chunked传输方式的？
+ 
+ 答： 因为默认情况下，使用.writeHead方法写入响应头后，允许使用.write方法写入任意长度的响应体数据，并使用.end方法结束一个响应。由于响应体数据长度不确定，因此NodeJS自动在响应头里添加了Transfer-Encoding: chunked字段，并采用chunked传输方式。但是当响应体数据长度确定时，可使用.writeHead方法在响应头里加上Content-Length字段，这样做之后NodeJS就不会自动添加Transfer-Encoding字段和使用chunked传输方式。
+ 
+ - 为什么使用http模块发起HTTP客户端请求时，有时候会发生socket hang up错误？
+ 
+ 答： 发起客户端HTTP请求前需要先创建一个客户端。http模块提供了一个全局客户端http.globalAgent，可以让我们使用.request或.get方法时不用手动创建客户端。但是全局客户端默认只允许5个并发Socket连接，当某一个时刻HTTP客户端请求创建过多，超过这个数字时，就会发生socket hang up错误。解决方法也很简单，通过http.globalAgent.maxSockets属性把这个数字改大些即可。另外，https模块遇到这个问题时也一样通过https.globalAgent.maxSockets属性来处理。
+ 
