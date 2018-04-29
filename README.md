@@ -846,6 +846,7 @@ Socket发起HTTP客户端请求
  - 'pipe' - 等同于 ['pipe', 'pipe', 'pipe'] （默认）
  - 'ignore' - 等同于 ['ignore', 'ignore', 'ignore']
  - 'inherit' - 等同于 [process.stdin, process.stdout, process.stderr] 或 [0,1,2] 使用父进程的stdio
+ 
  'ipc' - 创建一个用于父进程和子进程之间传递消息或文件描述符的 IPC 通道符。 一个 ChildProcess 最多只能有一个 IPC stdio 文件描述符。 设置该选项可启用 subprocess.send() 方法。 如果子进程是一个 Node.js 进程，则一个已存在的 IPC 通道会在子进程中启用 process.send()、process.disconnect()、process.on('disconnect') 和 process.on('message')。
  ### 守护子进程
  守护进程一般用于监控工作进程的运行状态，在工作进程不正常退出时重启工作进程，保障工作进程不间断运行。以下是一种实现方式。
