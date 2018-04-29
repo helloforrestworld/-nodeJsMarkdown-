@@ -734,3 +734,22 @@ Socket发起HTTP客户端请求
  
  答： 发起客户端HTTP请求前需要先创建一个客户端。http模块提供了一个全局客户端http.globalAgent，可以让我们使用.request或.get方法时不用手动创建客户端。但是全局客户端默认只允许5个并发Socket连接，当某一个时刻HTTP客户端请求创建过多，超过这个数字时，就会发生socket hang up错误。解决方法也很简单，通过http.globalAgent.maxSockets属性把这个数字改大些即可。另外，https模块遇到这个问题时也一样通过https.globalAgent.maxSockets属性来处理。
  
+ # 进程操作
+ ## 开始
+ NodeJs调用终端命令
+ 拷贝整个目录 cp -r source/* target
+ ```javascript
+  
+  var child_process = require('child_process');
+  var util = require('util');
+
+  function copy(source, target, callback) {
+     child_process.exec(util.format('cp -r %s/* %s', source, target), callback);
+  }
+  
+  copy('a', 'b', function (err) {
+     // ...
+  });
+ ```
+ 
+ 
