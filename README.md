@@ -841,6 +841,7 @@ Socket发起HTTP客户端请求
   });
  ```
  options.stdio
+ 
  options.stdio 选项用于配置子进程与父进程之间建立的管道。 默认情况下，子进程的 stdin、 stdout 和 stderr 会重定向到 ChildProcess 对象上相应的 subprocess.stdin、 subprocess.stdout 和 subprocess.stderr 流。 这等同于将 options.stdio 设为 ['pipe', 'pipe', 'pipe']。
  - 'pipe' - 等同于 ['pipe', 'pipe', 'pipe'] （默认）
  - 'ignore' - 等同于 ['ignore', 'ignore', 'ignore']
@@ -862,9 +863,7 @@ Socket发起HTTP客户端请求
 
   spawn('worker.js');
  ```
- **使用process对象管理自身。
-
-使用child_process模块创建和管理子进程。**
+ **使用process对象管理自身,使用child_process模块创建和管理子进程**
  
  
  
