@@ -751,5 +751,120 @@ Socket发起HTTP客户端请求
      // ...
   });
  ```
+ ## API
+ process 模块
+ process不是内置模块，而是一个全局对象，因此在任何地方都可以直接使用。
+ process对象可以查看进程的命令行参数(process.argv)，有标准输入标准输出，有运行权限，有运行环境和运行状态
+ 
+ ### 查看命令行参数
+ ```javascript
+  console.log(process.argv.slice(2))
+  // node执行程序路径和主模块文件路径固定占据了argv[0]和argv[1]两个位置
+ ```
+ ### 退出进程
+ 通常一个程序执行完所有任务后就会自动退出，退出状态码为0
+ 程序挂了的时候也会退出，退出状态码不为0
+ 有时候需要捕捉到某个错误后立马退出进程
+ ```javascript
+  try{
+    // ..  
+  } catch(err) {
+    process.exit(1) // 退出状态码为1
+  }
+ ```
+ ### 控制进程输入输出
+ 
+ NodeJS程序的标准输入流（stdin）、一个标准输出流（stdout）、一个标准错误流（stderr）分别对应process.stdin、process.stdout和process.stderr，第一个是只读数据流，后边两个是只写数据流，对它们的操作按照对数据流的操作方式即可。
+ 
+ ### 降权
+ 在Linux系统下，我们知道需要使用root权限才能监听1024以下端口。但是一旦完成端口监听后，继续让程序运行在root权限下存在安全隐患，因此最好能把权限降下来。以下是这样一个例子。
+ ```javascript
+   http.createServer(callback).listen(80, function () {
+    var env = process.env,
+        uid = parseInt(env['SUDO_UID'] || process.getuid(), 10), // 数字类型
+        gid = parseInt(env['SUDO_GID'] || process.getgid(), 10);
+
+    process.setgid(gid);
+    process.setuid(uid);
+  });
+  // 如果是通过sudo获取root权限的，运行程序的用户的UID和GID保存在环境变量SUDO_UID和SUDO_GID里边。如果是通过chmod +s方式获取root权限的，运行程序的用户的UID和GID可直接通过process.getuid和process.getgid方法获取。
+  // 降权时必须先降GID再降UID，否则顺序反过来的话就没权限更改程序的GID了。
+  // UID User Identification
+  // GID GroupId
+ ```
+ ### 创建子进程
+ child_process.spawn(exec, args, options)方法，该方法支持三个参数。第一个参数是执行文件路径，可以是执行文件的相对或绝对路径，也可以是根据PATH环境变量能找到的执行文件名。第二个参数中，数组中的每个成员都按顺序对应一个命令行参数。第三个参数可选，用于配置子进程的执行环境与行为。
+ ```javascript
+  let child_process = require('child_process')
+  let child = child_process.spawn('node', ['xxx.js'])
+  child.stdout.on('data', function(data) {
+    console.log('child-stdout:' + data)
+  })
+  child.stderr.on('data', function(data) {
+    console.log('child-stderr:' + data)
+  })
+  child.on('close', function(code) {
+    console.log('child-close-stdcode:' + code)
+  })
+ ```
+ ### 进程间通讯
+ 在Linux系统下，进程之间可以通过信号互相通信
+ ```javascript
+  /* parent.js */
+  var child = child_process.spawn('node', [ 'child.js' ]);
+
+  child.kill('SIGTERM');
+
+  /* child.js */
+  process.on('SIGTERM', function () {
+      cleanUp();
+      process.exit(0);
+  });
+ ```
+ 另外，如果父子进程都是NodeJS进程，就可以通过IPC（进程间通讯）双向传递数据。以下是一个例子。
+ ```javascript
+  /* parent.js */
+  var child = child_process.spawn('node', [ 'child.js' ], {
+          stdio: [ 0, 1, 2, 'ipc' ]
+      });
+
+  child.on('message', function (msg) {
+      console.log(msg);
+  });
+
+  child.send({ hello: 'hello' });
+
+  /* child.js */
+  process.on('message', function (msg) {
+      msg.hello = msg.hello.toUpperCase();
+      process.send(msg);
+  });
+ ```
+ options.stdio
+ options.stdio 选项用于配置子进程与父进程之间建立的管道。 默认情况下，子进程的 stdin、 stdout 和 stderr 会重定向到 ChildProcess 对象上相应的 subprocess.stdin、 subprocess.stdout 和 subprocess.stderr 流。 这等同于将 options.stdio 设为 ['pipe', 'pipe', 'pipe']。
+ - 'pipe' - 等同于 ['pipe', 'pipe', 'pipe'] （默认）
+ - 'ignore' - 等同于 ['ignore', 'ignore', 'ignore']
+ - 'inherit' - 等同于 [process.stdin, process.stdout, process.stderr] 或 [0,1,2] 使用父进程的stdio
+ 'ipc' - 创建一个用于父进程和子进程之间传递消息或文件描述符的 IPC 通道符。 一个 ChildProcess 最多只能有一个 IPC stdio 文件描述符。 设置该选项可启用 subprocess.send() 方法。 如果子进程是一个 Node.js 进程，则一个已存在的 IPC 通道会在子进程中启用 process.send()、process.disconnect()、process.on('disconnect') 和 process.on('message')。
+ ### 守护子进程
+ 守护进程一般用于监控工作进程的运行状态，在工作进程不正常退出时重启工作进程，保障工作进程不间断运行。以下是一种实现方式。
+ ```javascript
+  /* daemon.js */
+  function spawn(mainModule) {
+      var worker = child_process.spawn('node', [ mainModule ]);
+
+      worker.on('exit', function (code) {
+          if (code !== 0) {
+              spawn(mainModule);
+          }
+      });
+  }
+
+  spawn('worker.js');
+ ```
+ **使用process对象管理自身。
+
+使用child_process模块创建和管理子进程。**
+ 
  
  
