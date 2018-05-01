@@ -866,5 +866,135 @@ Socket发起HTTP客户端请求
  ```
  **使用process对象管理自身,使用child_process模块创建和管理子进程**
  
+ # 异步编程
+ ## 回调
+ 异步编程依托于回调来实现，但不能说使用了回调后程序就异步化了
+```javascript
+ function heavyCompute(n, callback) {
+     var count = 0,
+         i, j;
  
+     for (i = n; i > 0; --i) {
+         for (j = n; j > 0; --j) {
+             count += 1;
+         }
+     }
  
+     callback(count);
+ }
+ 
+ heavyCompute(10000, function (count) {
+     console.log(count);
+ });
+ 
+ console.log('hello'); 
+```
+但是，如果某个函数做的事情是创建一个别的线程或进程，并与JS主线程并行地做一些事情，并在事情做完后通知JS主线程，那情况又不一样了。我们接着看看以下代码。
+```javascript
+  setTimeout(function () {
+      console.log('world');
+  }, 1000);
+
+  console.log('hello');
+
+  -- Console ------------------------------
+  hello
+  world
+```
+这次可以看到，回调函数后于后续代码执行了。如同上边所说，JS本身是单线程的，无法异步执行，因此我们可以认为setTimeout这类JS规范之外的由运行环境提供的特殊函数做的事情是创建一个平行线程后立即返回，让JS主进程可以接着执行后续代码，并在收到平行进程的通知后再执行回调函数。除了setTimeout、setInterval这些常见的，这类函数还包括NodeJS提供的诸如fs.readFile之类的异步API。
+
+另外，我们仍然回到JS是单线程运行的这个事实上，这决定了JS在执行完一段代码之前无法执行包括回调函数在内的别的代码。也就是说，即使平行线程完成工作了，通知JS主线程执行回调函数了，回调函数也要等到JS主线程空闲时才能开始执行。以下就是这么一个例子。
+```javascript
+  function heavyCompute(n) {
+      var count = 0,
+          i, j;
+
+      for (i = n; i > 0; --i) {
+          for (j = n; j > 0; --j) {
+              count += 1;
+          }
+      }
+  }
+
+  var t = new Date();
+
+  setTimeout(function () {
+      console.log(new Date() - t);
+  }, 1000);
+
+  heavyCompute(50000);
+
+  -- Console ------------------------------
+  8520
+```
+可以看到，本来应该在1秒后被调用的回调函数因为JS主线程忙于运行其它代码，实际执行时间被大幅延迟。
+## 代码设计模式
+异步编程有很多特有的代码设计模式，为了实现同样的功能，使用同步方式和异步方式编写的代码会有很大差异。以下分别介绍一些常见的模式。
+### 函数返回值
+使用一个函数的输出作为另一个函数的输入是很常见的需求，在同步方式下一般按以下方式编写代码：
+```javascript
+  var output = fn1(fn2('input'));
+  // Do something.
+```
+而在异步方式下，由于函数执行结果不是通过返回值，而是通过回调函数传递，因此一般按以下方式编写代码：
+```javascript
+  fn2('input', function (output2) {
+      fn1(output2, function (output1) {
+          // Do something.
+      });
+  });
+```
+如果依赖多了，嵌套就会很臃肿
+### 遍历数组
+如果函数是异步执行的，以上代码就无法保证循环结束后所有数组成员都处理完毕了。如果数组成员必须一个接一个串行处理，则一般按照以下方式编写异步代码：
+```javascript
+  (function next(i, len, callback) {
+    if (i < len) {
+        async(arr[i], function (value) {
+            arr[i] = value;
+            next(i + 1, len, callback);
+        });
+    } else {
+        callback();
+    }
+  }(0, arr.length, function () {
+    // All array items have processed.
+  }));
+```
+如果数组成员可以并行处理，但后续代码仍然需要所有数组成员处理完毕后才能执行的话，则异步代码会调整成以下形式：
+```javascript
+  (function (i, len, count, callback) {
+      for (; i < len; ++i) {
+          (function (i) {
+              async(arr[i], function (value) {
+                  arr[i] = value;
+                  if (++count === len) {
+                      callback();
+                  }
+              });
+          }(i));
+      }
+  }(0, arr.length, 0, function () {
+      // All array items have processed.
+  }));
+```
+### 异常处理
+JS自身提供的异常捕获和处理机制——try..catch..，只能用于同步执行的代码。
+```javascript
+  function sync(fn) {
+    return fn();
+  }
+
+  try {
+    sync(null);
+    // Do something.
+  } catch (err) {
+    console.log('Error: %s', err.message);
+  }
+
+  -- Console ------------------------------
+  Error: object is not a function
+```
+可以看到，异常会沿着代码执行路径一直冒泡，直到遇到第一个try语句时被捕获住。但由于异步函数会打断代码执行路径，异步函数执行过程中以及执行之后产生的异常冒泡到执行路径被打断的位置时，如果一直没有遇到try语句，就作为一个全局异常抛出。以下是一个例子。
+
+
