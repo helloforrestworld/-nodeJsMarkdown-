@@ -1089,7 +1089,7 @@ JS自身提供的异常捕获和处理机制——try..catch..，只能用于同
 ```
 ## 域(Domain)
 NodeJS提供了domain模块，可以简化异步代码的异常处理。在介绍该模块之前，我们需要首先理解“域”的概念。简单的讲，一个域就是一个JS运行环境，在一个运行环境中，如果一个异常没有被捕获，将作为一个全局异常被抛出。NodeJS通过process对象提供了捕获全局异常的方法，示例代码如下
-```javscript
+```javascript
   process.on('uncaughtException', function (err) {
     console.log('Error: %s', err.message);
   });
@@ -1103,7 +1103,7 @@ NodeJS提供了domain模块，可以简化异步代码的异常处理。在介�
 ```
 虽然全局异常有个地方可以捕获了，但是对于大多数异常，我们希望尽早捕获，并根据结果决定代码的执行路径。我们用以下HTTP服务器代码作为例子：
 
-```javscript
+```javascript
   function async(request, callback) {
     // Do something.
     asyncA(request, function (err, data) {
@@ -1183,3 +1183,6 @@ NodeJS提供了domain模块，可以简化异步代码的异常处理。在介�
 
 ### 废弃
 NodeJs6.10后 Domain被废弃
+使用Promise/ async,await
+
+# 实例
