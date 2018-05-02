@@ -1273,3 +1273,165 @@ NodeJs6.10后 Domain被废弃
 
   main(process.argv.slice(2))
 ```
+## 第二次迭代
+1.当请求的文件比较多比较大时，串行读取文件会比较耗时，从而拉长了服务端响应等待时间。
+
+2.由于每次响应输出的数据都需要先完整地缓存在内存里，当服务器请求并发数较大时，会有较大的内存开销。
+
+对于第一个问题，很容易想到把读取文件的方式从串行改为并行。但是别这样做，因为对于机械磁盘而言，因为只有一个磁头，尝试并行读取文件只会造成磁头频繁抖动，反而降低IO效率。而对于固态硬盘，虽然的确存在多个并行IO通道，但是对于服务器并行处理的多个请求而言，硬盘已经在做并行IO了，对单个请求采用并行IO无异于拆东墙补西墙。因此，正确的做法不是改用并行IO，而是一边读取文件一边输出响应，把响应输出时机提前至读取第一个文件的时刻。
+```javascript
+  const http = require('http')
+  const path = require('path')
+  const fs = require('fs')
+
+  const MIME = {
+    '.css': 'text/css',
+    '.js': 'application/javascript'
+  }
+
+
+  function main(argv) {
+    let config = JSON.parse(fs.readFileSync(argv[0], 'utf-8'))
+    let port = config.port || 80
+    let root = config.root || '.'
+    http.createServer(function(request, response) {
+      let url = request.url
+      let urlInfo = parseUrl(root, url)
+      validataUrl(urlInfo.pathnames, (err, pathnames) => {
+        if (err) {
+          console.log(err)
+          response.writeHead(404)
+          response.end(err.message)
+        } else {
+          response.writeHead(200, {
+            'Content-Type': urlInfo.mime
+          })
+          outputFiles(pathnames, response)
+        }
+      })
+    }).listen(port, function(err) {
+      if (err) {
+        console.log(err)
+        return
+      }
+      console.log(`a server has running at port: ${port}\n`)
+    })
+  }
+
+  function outputFiles(pathnames, writer) {
+    (function next(i, len){
+      if (i < len) {
+        let reader = fs.createReadStream(pathnames[i]);
+        reader.pipe(writer, {end: false})
+        reader.on('end', () => {
+          next(i + 1, len)
+        })
+      } else {
+        writer.end()
+      }
+    }(0, pathnames.length))
+  }
+
+  function validataUrl(pathnames, callback) { // 验证url合法性
+    (function next(i, len){
+      if (i < len) {
+        fs.stat(pathnames[i], (err, stats) => {
+          if (err) {
+            callback(err)
+          } else if (!stats.isFile()) {
+            callback(new Error(pathnames[i] + 'can not read file'))
+          } else {
+            next(i + 1, len)
+          }
+        })
+      } else {
+        callback(null, pathnames)
+      }
+    }(0, pathnames.length))
+  }
+
+  function parseUrl(root, url) {
+    let base, parts, pathnames
+    if (url.indexOf('??') === -1) {
+      url = url.replace('/', '/??')
+    }
+    parts = url.split('??')
+    base = parts[0]
+    pathnames = parts[1].split(',').map((pathItem) => {
+      return path.join(root, base, pathItem)
+    })
+    return {
+      mime: MIME[path.extname(pathnames[0])] || 'text/plain',
+      pathnames
+    }
+  }
+
+  main(process.argv.slice(2))
+```
+## 第三次迭代
+
+从工程角度上讲，没有绝对可靠的系统。即使第二次迭代的代码经过反复检查后能确保没有bug，也很难说是否会因为NodeJS本身，或者是操作系统本身，甚至是硬件本身导致我们的服务器程序在某一天挂掉。因此一般生产环境下的服务器程序都配有一个守护进程，在服务挂掉的时候立即重启服务。一般守护进程的代码会远比服务进程的代码简单，从概率上可以保证守护进程更难挂掉。如果再做得严谨一些，甚至守护进程自身可以在自己挂掉时重启自己，从而实现双保险。
+
+守护代码如下
+```javascript
+  var cp = require('child_process');
+
+  var worker;
+
+  function spawn(server, config) {
+      worker = cp.spawn('node', [server, config ], {'stdio': [0, 1, 2]});
+      worker.on('error', (err) => {
+        console.log(err)
+      })
+      worker.on('exit', function (code) {
+          if (code !== 0) {
+              spawn(server, config);
+          }
+      })
+  }
+
+  function main(argv) {
+      spawn('13-merge2.js', argv[0]);
+      process.on('SIGTERM', function () {
+          worker.kill();
+          process.exit(0);
+      });
+  }
+
+  main(process.argv.slice(2));
+```
+服务器代码部分修改
+```javascript
+  function main(argv) {
+    let config = JSON.parse(fs.readFileSync(argv[0], 'utf-8'))
+    let port = config.port || 80
+    let root = config.root || '.'
+    let server = http.createServer(function(request, response) {
+      let url = request.url
+      let urlInfo = parseUrl(root, url)
+      validataUrl(urlInfo.pathnames, (err, pathnames) => {
+        if (err) {
+          console.log(err)
+          response.writeHead(404)
+          response.end(err.message)
+        } else {
+          response.writeHead(200, {
+            'Content-Type': urlInfo.mime
+          })
+          outputFiles(pathnames, response)
+        }
+      })
+    }).listen(port, function(err) {
+      if (err) {
+        console.log(err)
+        return
+      }
+      console.log(`a server has running at port: ${port}\n`)
+    })
+    process.on('SIGTERM', function() {
+      server.close(function() { // 关闭服务器
+        process.exit(0) // 进程退出
+      })
+    })
+  }
+```
