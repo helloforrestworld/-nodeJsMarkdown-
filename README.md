@@ -1186,3 +1186,90 @@ NodeJs6.10后 Domain被废弃
 使用Promise/ async,await
 
 # 实例
+## 需求
+我们要开发的是一个简单的静态文件合并服务器，该服务器需要支持类似以下格式的JS或CSS文件合并请求。
+> http://assets.example.com/foo/??bar.js,baz.js
+
+在以上URL中，??是一个分隔符，之前是需要合并的多个文件的URL的公共部分，之后是使用,分隔的差异部分。因此服务器处理这个URL时，返回的是以下两个文件按顺序合并后的内容。
+
+> /foo/bar.js
+  /foo/baz.js
+  
+另外，服务器也需要能支持类似以下格式的普通的JS或CSS文件请求。
+
+> http://assets.example.com/foo/bar.js
+
+迭代版本1
+```javascript
+  const http = require('http')
+  const path = require('path')
+  const fs = require('fs')
+
+  const MIME = {
+    '.css': 'text/css',
+    '.js': 'application/javascript'
+  }
+
+  function combineFiles(pathnames, callback) {
+    let output = [];
+    (function next(i, len){
+      if (i < len) {
+        fs.readFile(pathnames[i], (err, data) => {
+          if (err) {
+            callback(err)
+          } else {
+            output.push(data)
+            next(i + 1, len)
+          }
+        })
+      } else {
+        callback(null, Buffer.concat(output))
+      }
+    }(0, pathnames.length));
+  }
+
+  function main(argv) {
+    let config = JSON.parse(fs.readFileSync(argv[0], 'utf-8'))
+    let port = config.port || 80
+    let root = config.root || '.'
+    http.createServer(function(request, response) {
+      let url = request.url
+      let urlInfo = parseUrl(root, url)
+      combineFiles(urlInfo.pathnames, (err, data) => {
+        if (err) {
+          response.writeHead(404)
+          response.end(err.message)
+        } else {
+          response.writeHead(200, {
+            'Content-Type': urlInfo.mime
+          })
+          response.end(data)
+        }
+      })
+    }).listen(port, function(err) {
+      if (err) {
+        console.log(err)
+        return
+      }
+      console.log(`a server has running at port: ${port}\n`)
+    })
+  }
+
+  function parseUrl(root, url) {
+    let base, parts, pathnames
+    if (url.indexOf('??') === -1) {
+      url = url.replace('/', '/??')
+    }
+    parts = url.split('??')
+    base = parts[0]
+    pathnames = parts[1].split(',').map((pathItem) => {
+      return path.join(root, base, pathItem)
+    })
+    return {
+      mime: MIME[path.extname(pathnames[0])] || 'text/plain',
+      pathnames
+    }
+  }
+
+  main(process.argv.slice(2))
+```
