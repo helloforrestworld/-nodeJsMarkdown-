@@ -9,8 +9,6 @@
 # 搭建基础
 ## nvm node版本管理工具
 ```javascript
-    nvm use 4.4.0
-    npm install gulp-cli -g
     
     nvm list available 有效的node版本
     
@@ -21,6 +19,10 @@
     nvm install stable
     
     nvm install stable defalut
+    
+    nvm use 版本号
+    
+    nvm alias default 版本号
 ```
 
 ## 权限问题
