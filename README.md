@@ -8,4 +8,4 @@
 - [node初探][1]
 
 
-  [1]: https://helloforrestworld.github.io/NodeJsMarkdown/node%E5%88%9D%E6%8E%A2/README.md
+  [1]: https://github.com/helloforrestworld/NodeJsMarkdown/blob/master/node%E5%88%9D%E6%8E%A2/README.md
