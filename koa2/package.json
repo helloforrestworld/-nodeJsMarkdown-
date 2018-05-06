@@ -4,14 +4,22 @@
   "description": "标签（空格分隔）： 笔记整理",
   "main": "cb-promise.js",
   "scripts": {
+    "dev": "nodemon -w src --exec \"babel-node src --presets env\"",
+    "build": "rimraf dist && babel src -s -D -d dist --presets env",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "co": "^4.6.0"
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "co": "^4.6.0",
+    "rimraf": "^2.6.2"
   },
   "dependencies": {
-    "node-fetch": "^2.1.2"
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-runtime": "^6.26.0",
+    "node-fetch": "^2.1.2",
+    "nodemon": "^1.17.4"
   }
 }

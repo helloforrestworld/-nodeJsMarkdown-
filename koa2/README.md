@@ -49,3 +49,82 @@ co库的规范化
   init()
 ```
 
+## import/export require/exports
+### 区别
+ES6 模块的设计思想，是尽量的静态化，使得编译时就能确定模块的依赖关系，以及输入和输出的变量。
+Require是CommonJS的语法，CommonJS的模块是对象，输入时必须查找对象属性。
+```javascript
+  // CommonJS模块
+  let { stat, exists, readFile } = require('fs');
+
+  // 等同于
+  let _fs = require('fs');
+  let stat = _fs.stat;
+  let exists = _fs.exists;
+  let readfile = _fs.readfile;
+```
+整体加载fs模块（即加载fs所有方法），生成一个对象_fs，然后再从这个对象上读取三个方法，这叫运行时加载，因为只有运行时才能得到这个对象，不能在编译时做到静态化。
+
+ES6模块不是对象，而是通过export命令显示指定输出代码，再通过import输入。
+```javascript
+  import { stat, exists, readFile } from 'fs';
+```
+从fs加载“stat, exists, readFile” 三个方法，其他方法不加载，
+### 通过babel编辑让Node开发环境中支持import export
+安装依赖
+```javascript
+ npm i babel-cli babel-presets-env -D // balbel
+ npm i nodemon -S  // 监控目录
+```
+配置.babelrc
+```javascript
+{
+  "presets": [
+    [
+      "env",
+      {
+        "targets":{
+          "node": "current"
+        }
+      }
+    ]
+  ]
+}
+```
+配置package.json script
+```javascript
+"scripts": {
+  "dev": "nodemon -w src --exec \"babel-node src --presets env\""
+}
+```
+然后npm run dev就可以正常运行
+### babel编译打包配置
+安装依赖
+```javascript
+  npm - rimraf -D  (每次打包dist都能删除前一个)
+```
+脚本配置
+```javascript
+  "script": {
+    "dev" : "nodemon -w src --exec \"babel-node src --presets env\"",
+    "build": "rimraf dist && babel src -s -D -d dist --presets env"
+  }
+```
+代码用到了async等es7语法特性，编译打包后无法使用， 原因是babel默认支持es6的编译
+安装babel-runtime babel-plugin-tranform-run-time
+安装依赖
+```javascript
+  npm i -S babel-plugin-tranform-run-time babel-runtime
+```
+配置babel插件
+```javascript
+  "plugin": [
+    [
+      "transform-runtime",
+      {
+        "polyfill": false,
+        "regenerator": true
+      }
+    ]
+  ]
+```
