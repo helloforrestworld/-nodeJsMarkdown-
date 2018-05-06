@@ -1,0 +1,11 @@
+{
+  "name": "koa2",
+  "version": "1.0.0",
+  "description": "标签（空格分隔）： 笔记整理",
+  "main": "cb-promise.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
