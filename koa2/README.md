@@ -193,4 +193,10 @@ Application类
   }
   
   
+  listen(...args) {
+    debug('listen');
+    const server = http.createServer(this.callback()); // 调用http模块 创建应用 传入处理后的callback
+    return server.listen(...args);
+  }
+  
 ```
