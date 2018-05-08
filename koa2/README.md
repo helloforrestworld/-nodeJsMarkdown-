@@ -263,4 +263,13 @@ Application类
     return context;
   }
   
+  // respond函数
+  // 判断body类型 决定返回方式
+  if (Buffer.isBuffer(body)) return res.end(body);
+  if ('string' == typeof body) return res.end(body);
+  if (body instanceof Stream) return body.pipe(res);
 ```
+所有整个application的能力就是
+- new koa() 生成application对象 继承env、middleware等属性
+- app.use(fn) 向中间件数组push fn
+- app.listen ctx生成 开启服务器监听端口 等待请求 => 请求 => handleRequest => 处理中间件函数 => 处理返回
