@@ -195,8 +195,72 @@ Application类
   
   listen(...args) {
     debug('listen');
-    const server = http.createServer(this.callback()); // 调用http模块 创建应用 传入处理后的callback
+    const server = http.createServer(this.callback()); // 调用callback返回handleRequest
     return server.listen(...args);
+  }
+  
+  
+  callback() {
+    const fn = compose(this.middleware); 
+    // compose
+    // 处理中间件函数
+    // 返回一个可以依次执行中间件函数的函数
+    // return function (context, next) {
+    //   // last called middleware #
+    //   let index = -1
+    //   return dispatch(0)
+    //   function dispatch (i) {
+    //     if (i <= index) return Promise.reject(new Error('next() called multiple times'))
+    //     index = i
+    //     let fn = middleware[i]
+    //     if (i === middleware.length) fn = next
+    //     if (!fn) return Promise.resolve()
+    //     try {
+    //       return Promise.resolve(fn(context, function next () {
+    //         return dispatch(i + 1)
+    //       }))
+    //     } catch (err) {
+    //       return Promise.reject(err)
+    //     }
+    //   }
+    // }
+
+    const handleRequest = (req, res) => {
+      const ctx = this.createContext(req, res); // ctx供上下游使用
+      return this.handleRequest(ctx, fn); // 真正处理请求和响应的函数
+    };
+
+    return handleRequest;
+  }
+  
+  handleRequest(ctx, fnMiddleware) {
+    const res = ctx.res;
+    const handleResponse = () => respond(ctx);
+    return fnMiddleware(ctx).then(handleResponse).catch(onerror); // 执行中间件函数并且处理返回
+  }
+  
+  
+  createContext(req, res) {
+    // 就是创建context 把 request respond 信息写入
+    // 并且同样把写好的context挂在在requeset respond上
+    const context = Object.create(this.context);
+    const request = context.request = Object.create(this.request);
+    const response = context.response = Object.create(this.response);
+    context.app = request.app = response.app = this;
+    context.req = request.req = response.req = req;
+    context.res = request.res = response.res = res;
+    request.ctx = response.ctx = context;
+    request.response = response;
+    response.request = request;
+    context.originalUrl = request.originalUrl = req.url;
+    context.cookies = new Cookies(req, res, {
+      keys: this.keys,
+      secure: request.secure
+    });
+    request.ip = request.ips[0] || req.socket.remoteAddress || '';
+    context.accept = request.accept = accepts(req);
+    context.state = {};
+    return context;
   }
   
 ```
