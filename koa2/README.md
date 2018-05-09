@@ -270,6 +270,184 @@ Application类
   if (body instanceof Stream) return body.pipe(res);
 ```
 所有整个application的能力就是
-- new koa() 生成application对象 继承env、middleware等属性
-- app.use(fn) 向中间件数组push fn
+- new koa() 生成application对象注入env，middleware callback listen等并且继承自Emiter方法和属性
+- app.use(fn) 加载中间件 （向middleware push fn)
 - app.listen ctx生成 开启服务器监听端口 等待请求 => 请求 => handleRequest => 处理中间件函数 => 处理返回
+
+
+context模块
+返回一个集合request,respond属性方法的对象
+context模块核心在于delegate模块
+```javascript
+ delegate(proto, 'response') // 把response 的方法挂到proto对象上
+  .method('attachment')
+  .method('redirect')
+  .method('remove')
+  .method('vary')
+  .method('set')
+  .method('append')
+  .method('flushHeaders')
+  .access('status')
+  .access('message')
+```
+
+request模块
+暴露出的某些属性的getter setter
+定义某些可以访问修改的属性和方法
+```javascript
+  get url() {
+    return this.req.url;
+  },
+  set url(val) {
+    this.req.url = val;
+  }
+```
+
+response模块
+与requeset模块类似， 里面暴露出一些可以访问或者修改的属性和方法
+```javascript
+  get body() {
+    return this._body;
+  },
+  
+  set body(val) {
+    const original = this._body;
+    this._body = val;
+
+    // no content
+    if (null == val) {
+      if (!statuses.empty[this.status]) this.status = 204;
+      this.remove('Content-Type');
+      this.remove('Content-Length');
+      this.remove('Transfer-Encoding');
+      return;
+    }
+
+    // set the status
+    if (!this._explicitStatus) this.status = 200; // 响应体初始化
+
+    // set the content-type only if not yet set
+    const setType = !this.header['content-type'];
+
+    // string
+    if ('string' == typeof val) {       // 根据val的类型配置相关属性
+      if (setType) this.type = /^\s*</.test(val) ? 'html' : 'text';
+      this.length = Buffer.byteLength(val);
+      return;
+    }
+
+    // buffer
+    if (Buffer.isBuffer(val)) {
+      if (setType) this.type = 'bin';
+      this.length = val.length;
+      return;
+    }
+
+    // stream
+    if ('function' == typeof val.pipe) {
+      onFinish(this.res, destroy.bind(null, val));
+      ensureErrorHandler(val, err => this.ctx.onerror(err));
+
+      // overwriting
+      if (null != original && original != val) this.remove('Content-Length');
+
+      if (setType) this.type = 'bin';
+      return;
+    }
+
+    // json
+    this.remove('Content-Length');
+    this.type = 'json';
+  }
+  
+  
+  vary(field) { // 响应的内容不是常规的accept 需要定义vary字段 并且vary字段有agent
+    if (this.headerSent) return;
+
+    vary(this.res, field);
+  },
+  
+  
+  set lastModified(val) { // 修改文件最后一次更新时间 通常用于通知客服端不需要再使用缓存
+    if ('string' == typeof val) val = new Date(val);
+    this.set('Last-Modified', val.toUTCString());
+  },
+  
+  set etag(val) { // 通常配合lastModified使用 如有些文件需要周期性修改 
+    if (!/^(W\/)?"/.test(val)) val = `"${val}"`;
+    this.set('ETag', val);
+  },
+```
+
+中间件middlewares
+多个中间依次执行
+```javascript
+  const koa = require('koa')
+  const app = new koa()
+
+  const mid1 = async (ctx, next) => {
+    ctx.type = 'text/html; charset=utf-8'
+    await next()
+  }
+
+  const mid2 = async (ctx, next) => {
+    ctx.body = 'Hi'
+    await next()
+  }
+
+  const mid3 = async (ctx, next) => {
+    ctx.body = ctx.body + ' Forrest'
+    // awit next()
+  }
+
+  app.use(mid1)
+  app.use(mid2)
+  app.use(mid3)
+
+  app.listen(8080, (err) => {
+    if (err) {
+      console.log(err)
+    } else {
+      console.log('A Server Running at port 8080')
+    }
+  })
+  
+  // 最后输出 Hi Forrest 并且是text/html
+```
+还可以通过next调整执行顺序
+```javascript
+  const mid1 = async (ctx, next) => {
+    ctx.body = 'text start:'
+    await next()
+    ctx.body = ctx.body + ' where am i'
+  }
+
+  const mid2 = async (ctx, next) => {
+    ctx.type = 'text/html; charset=utf-8'
+    ctx.body = ctx.body + 'Hi'
+    await next()
+  }
+
+  const mid3 = async (ctx, next) => {
+    ctx.body = ctx.body + ' Forrest'
+    // awit next()
+  }
+  // 最后输出的是 'text start: Hi Forrest where am i'
+```
+通过next可以交出控制权, 调整中间件的执行过程
+通过async/await 即使中间件需要执行异步操作 执行顺序也能够很好的控制 (并且以同步代码的方式书写)
+
+栗子：使用koa-logger中间件
+```javascript
+  npm i koa-logger -S
+  
+  // server.js
+  const logger = require('koa-logger')
+  
+  app.use(logger())
+  
+  // 查出koa-logger源码
+  // index.js
+  // module.exports = dev
+  // dev 执行 返回 一个 async函数
+```
