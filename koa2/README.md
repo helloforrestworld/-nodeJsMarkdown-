@@ -525,3 +525,217 @@ koa-compose分析
   // dispatch就是纯函数 
   // 且里面用到的就是尾递归
 ```
+
+### koa-session
+安装
+```javascript
+  npm i koa-session -S
+```
+配合cookies使用, 校验和设置用户的状态
+
+记录浏览次数栗子
+```javascript
+  const session = require('koa-session')
+  app.use(session(app));
+  
+  app.keys = ['view time'];
+  
+  app.use(async ctx => {
+    // ignore favicon
+    if (ctx.path === '/favicon.ico') return;
+  
+    let n = ctx.session.views || 0;
+    ctx.session.views = ++n;
+    ctx.body = n + ' views';
+  });
+  
+  app.listen(8080)
+```
+简易的路由
+```javascript
+  app.use(async ctx => {
+    ctx.type = 'text/html charset=utf-8'
+    if (ctx.path === '/name') {
+      ctx.body = 'Forrest'
+      return
+    }
+    if (ctx.path === '/age') {
+      ctx.body = '18'
+      return
+    }
+    
+    if (ctx.path === '/favicon.ico') return;
+    let n = ctx.session.views || 0;
+    ctx.session.views = ++n;
+    ctx.body = n + ' views';
+  })
+```
+### 总结
+- 在koa2里面，一切流程都是中间件, 通过compose组合起来， next函数把每个中间件函数一次执行
+- 每个中间件都会拿到http请求的上下文和next(控制器？)
+- 通过ctx对象可以访问到request,respond的属性和方法，request,respond也能访问到ctx
+- 注意ctx.request/respond是koa扩充的对象 ctx.req/res是node的原生对象
+- context request respond midllewares 四个核心概念, 但是复杂的是http协议、资源请求，tcp ip协议相关的网络通讯设定，请求性能的优化等
+
+**koa2实现结构图**
+![此处输入图片的描述][1]
+
+## koa2杂项
+### koa1 升级到 koa2
+koa1到koa2主要是从generation + co => async/await 还有es5 => es6es6的升级
+
+koa1写法
+```javascript
+  var koa = require('koa')
+  var app = new koa()
+  var logger = require('koa-logger')
+
+  app.use(logger())
+
+  function indent(n) {
+    return new Array(n).join('&nbsp')
+  }
+
+  var mid1 = function() {
+    return function *(next){
+      this.type = 'text/html;charset=utf-8'
+      this.body += '<h2 style="color:red">请求 =>' + indent(2) + '第一层中间件</h2> '
+      yield next
+      this.body +=  '<h2 style="color:red">响应 <=' + indent(2) + '第一层中间件</h2> '
+    }
+  }
+
+  var mid2 = function() {
+    return function *(next){
+      this.body += '<h2 style="color:red">请求 =>' + indent(4) + '第二层中间件</h2> '
+      yield next
+      this.body +=  '<h2 style="color:red">响应 <=' + indent(4) + '第二层中间件</h2> '
+    }
+  }
+
+  var mid3 = function() {
+    return function *(next){
+      this.body += '<h2 style="color:red">请求 =>' + indent(8) + '第三层中间件</h2> '
+      yield next
+      this.body +=  '<h2 style="color:red">响应 <=' + indent(8) + '第三层中间件</h2> '
+    }
+  }
+
+  app.use(mid1())
+  app.use(mid2())
+  app.use(mid3())
+  app.use(function *(next) {
+    this.body +=  '<h1>'+ indent(12) +'<= &nbsp 处理核心业务 &nbsp =></h1> '
+  })
+
+  app.listen(8080)
+```
+koa2写法
+```javascript
+  const koa = require('koa')
+  const app = new koa()
+  const logger = require('koa-logger')
+  const convert = require('koa-convert')
+
+  app.use(convert(logger()))
+  // app.use(logger())
+  function indent(n) {
+    return new Array(n).join('&nbsp')
+  }
+
+  const mid1 = () => {
+    return async (ctx, next) => {
+      ctx.type = 'text/html;charset=utf-8'
+      ctx.body += `<h2 style="color:red">请求 =>${indent(2)}第一层中间件</h2> `
+      await next()
+      ctx.body +=  `<h2 style="color:red">响应 <=${indent(2)}第一层中间件</h2> `
+    }
+  }
+
+  const mid2 = () => {
+    return async (ctx, next) => {
+      ctx.body += `<h2 style="color:red">请求 => ${indent(4)}第二层中间件</h2> `
+      await next()
+      ctx.body +=  `<h2 style="color:red">响应 <=${indent(4)}第二层中间件</h2> `
+    }
+  }
+
+  const mid3 = () => {
+    return async (ctx, next) => {
+      ctx.body += `<h2 style="color:red">请求 =>${indent(8)}第三层中间件</h2> `
+      await next()
+      ctx.body +=  `<h2 style="color:red">响应 <=${indent(8)}第三层中间件</h2> `
+    }
+  }
+
+  app.use(mid1())
+  app.use(mid2())
+  app.use(mid3())
+  app.use(async (ctx, next) => {
+    ctx.body +=  `<h1>${indent(12)} <= &nbsp 处理核心业务 &nbsp =></h1>`
+  })
+
+  app.listen(8080)
+```
+
+### 对比express
+用express模拟request => 中间件 => response 模型
+```javascript
+  const express = require('express')
+  const app = express()
+
+  function indent(n) {
+    return new Array(n).join('&nbsp')
+  }
+
+  const mid1 = () => {
+    return  (req, res, next) => {
+      res.body += `<h2 style="color:red">请求 =>${indent(2)}第一层中间件</h2> `
+      next()
+      res.body +=  `<h2 style="color:red">响应 <=${indent(2)}第一层中间件</h2> `
+    }
+  }
+
+  const mid2 = () => {
+    return  (req, res, next) => {
+      res.body += `<h2 style="color:red">请求 =>${indent(2)}第二层中间件</h2> `
+      next()
+      res.body +=  `<h2 style="color:red">响应 <=${indent(2)}第二层中间件</h2> `
+    }
+  }
+
+  const mid3 = () => {
+    return  (req, res, next) => {
+      res.body += `<h2 style="color:red">请求 =>${indent(2)}第三层中间件</h2> `
+      next()
+      res.body +=  `<h2 style="color:red">响应 <=${indent(2)}第三层中间件</h2> `
+    }
+  }
+
+  app.use(mid1())
+  app.use(mid2())
+  app.use(mid3())
+  app.get('/', (req, res) => {
+    res.send(res.body + `<h1>${indent(12)} <= &nbsp 处理核心业务 &nbsp =></h1>`)
+  })
+
+  app.listen(8080)
+```
+打印出来的效果是这样的
+![此处输入图片的描述][2]
+而koa2的洋葱模型是这样的
+![此处输入图片的描述][3]
+需要借助事件的分发才能实现koa2的‘洋葱模型’
+
+
+**总结**
+
+- koa2底层的流程都是通过async/await控制，整个事件模型比较清晰
+- koa2框架本身比较纯净， 比较容易深度定制而且对流的支持度也很好
+- koa2与express的中间件加载和实现方式是截然不同的，可以导致两种完全不同的中间件设计和处理方式
+- express 总得来说大而全 , koa2小而精
+
+
+  [1]: https://ws1.sinaimg.cn/large/e8323205gy1fr5wzxxnzrj22041320wu.jpg
+  [2]: https://ws1.sinaimg.cn/large/e8323205gy1fr5wwynk81j20q90ajaag.jpg
+  [3]: https://ws1.sinaimg.cn/large/e8323205gy1fr5wxqsd6tj20r10hsdgr.jpg
