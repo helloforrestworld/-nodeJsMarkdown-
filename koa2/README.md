@@ -447,8 +447,76 @@ response模块
   
   app.use(logger())
   
-  // 查出koa-logger源码
+  // 查看koa-logger源码
   // index.js
   // module.exports = dev
   // dev 执行 返回 一个 async函数
+```
+
+koa-compose模块分析
+koa-compose用于管理中间件，传入中间件数组，返回一个可递归执行中间件函数的函数
+且暴露出next方法可以控制执行流程
+```javascript
+  // koa-compose 核心源码
+  return function (context, next) {
+    let index = -1
+    return dispatch(0)
+    function dispatch (i) {
+      // if (i <= index) return Promise.reject(new Error('next() called multiple times'))
+      index = i
+      let fn = middleware[i]
+      // if (i === middleware.length) fn = next
+      // if (!fn) return Promise.resolve()
+      return Promise.resolve(fn(context, function next () {
+        return dispatch(i + 1)
+      }))
+    }
+  }
+```
+尾递归与纯函数
+
+纯函数
+
+一个函数的返回结果只依赖于它的参数，并且在执行过程里面没有副作用，我们就把这个函数叫做纯函数。
+```javascript
+  funtion pure(i) {
+    return i + 1
+  }
+  pure(1)
+  pure(2)
+  pure(3)
+```
+尾递归
+
+尾递归的判断标准是函数运行最后一步是否调用自身，而不是是否在函数的最后一行调用自身
+```javascript
+  // 非尾递归
+  function factorial(n) {
+   if (n === 1) return 1;
+   return n * factorial(n-1); // 最后一步不是调用自身，因此不是尾递归
+  }
+  // 尾递归
+  function factorial(n, total) {
+    if (n === 1) return total;
+    return factorial(n - 1, n * total);
+  }
+```
+尾递归的好处就是, 里层调用不要依赖外层caller环境, 调用的时候可以直接覆盖原有的栈，而不是像普通
+递归一样，新开一个栈，从而节约消耗
+参考
+> http://www.ruanyifeng.com/blog/2015/04/tail-call.html
+
+koa-compose分析
+```javascript
+  // dispatch(0)调用
+  
+  // 执行 middlewares[0] 并返回一个promise
+  return Promise.resolve(fn(context, function next () {
+    return dispatch(i + 1)
+  }))
+  // next 控制下一个中间件执行 
+  // next 暴露出给中间件函数的第二个参数, 从而可以控制下一个中间件函数执行
+  
+  // dispatch就是纯函数 
+  // 且里面用到的就是尾递归
 ```
