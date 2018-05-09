@@ -454,6 +454,7 @@ response模块
 ```
 
 koa-compose模块分析
+
 koa-compose用于管理中间件，传入中间件数组，返回一个可递归执行中间件函数的函数
 且暴露出next方法可以控制执行流程
 ```javascript
@@ -503,6 +504,7 @@ koa-compose用于管理中间件，传入中间件数组，返回一个可递归
 ```
 尾递归的好处就是, 里层调用不要依赖外层caller环境, 调用的时候可以直接覆盖原有的栈，而不是像普通
 递归一样，新开一个栈，从而节约消耗
+
 参考
 > http://www.ruanyifeng.com/blog/2015/04/tail-call.html
 
