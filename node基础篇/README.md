@@ -351,4 +351,4 @@ server.listen(3000, err => {
 
 ## 路由
 
-[链接](https://github.com/helloforrestworld/NodeJsMarkdown/blob/master/7-Web服务器组织/)
+[链接](https://github.com/helloforrestworld/-nodeJsMarkdown-/tree/master/node%E5%9F%BA%E7%A1%80%E7%AF%87/7-Web%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%BB%84%E7%BB%87)
