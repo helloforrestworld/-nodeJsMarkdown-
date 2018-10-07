@@ -7,6 +7,18 @@
   <title>Document</title>
 </head>
 <body>
-  home page
+  <form action="/api/v1/records" method="POST">
+    <p>
+      <label for="">姓名</label>
+      <input type="text" name="name">
+    </p>
+    <p>
+      <label for="">年龄</label>
+      <input type="text" name="age">
+    </p>
+    <p>
+      <input type="submit" value="提交">
+    </p>
+  </form>
 </body>
 </html>
