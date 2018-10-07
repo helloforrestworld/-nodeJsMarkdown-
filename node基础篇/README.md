@@ -275,3 +275,80 @@ readStream // reads current file
     console.log('done')
   })
 ```
+
+## Web 服务器
+
+一个简单的服务器
+
+```javascript
+const http = require('http')
+
+// 创建服务器
+const server = http.createServer((request, response) => {
+  console.log('request receive')
+  response.writeHead(200, { 'Content-Type': 'text/plain' })
+
+  // response.write('this is a response text')
+  // response.end()
+
+  response.end('this is a response text')
+})
+
+// 监听窗口
+server.listen(3000, err => {
+  console.log('A Server has been started at localhost port 3000！')
+})
+```
+
+Content-Type
+
+```javascript
+const http = require('http')
+
+const json = {
+  name: 'sun',
+  age: 18
+}
+
+// 响应处理
+const responseHandler = (request, response) => {
+  console.log('request receive')
+  response.writeHead(200, { 'Content-Type': 'application/json ' })
+  response.end(JSON.stringify(json))
+}
+
+// 创建服务器
+const server = http.createServer(responseHandler)
+
+// 监听窗口
+server.listen(3000, err => {
+  console.log('A Server has been started at localhost port 3000！')
+})
+```
+
+返回 html 页面
+
+```javascript
+const http = require('http')
+const fs = require('fs')
+
+// 响应处理
+const responseHandler = (request, response) => {
+  console.log('request receive')
+  response.writeHead(200, { 'Content-Type': 'text/html ' })
+  const readStream = fs.createReadStream(__dirname + '/index.html')
+  readStream.pipe(response)
+}
+
+// 创建服务器
+const server = http.createServer(responseHandler)
+
+// 监听窗口
+server.listen(3000, err => {
+  console.log('A Server has been started at localhost port 3000！')
+})
+```
+
+## 路由
+
+[链接](https://github.com/helloforrestworld/NodeJsMarkdown/blob/master/7-Web服务器组织/)
